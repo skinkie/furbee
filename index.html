@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title></title>
+        <title>Furbee</title>
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -19,21 +19,250 @@
         <![endif]-->
 
         <!-- Add your site or application content here -->
-        <p>Hello world! This is HTML5 Boilerplate.</p>
+        <p>FurBEE Simulator</p>
+        <div id="clock"></div>
+        <div id="workers"></div>
+        <div id="drones"></div>
+        <div id="honey_store"></div>
+        <div id="pollen_store"></div>
+        <div id="cells"></div>
+        <div id="eggs"></div>
+	<input type="button" value="harvesthoney" onclick="harvesthoney();" />
 
-        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
-        <script>window.jQuery || document.write('<script src="js/vendor/jquery-1.11.1.min.js"><\/script>')</script>
+        <div id="placeholder" style="width: 100%; height: 600px;"></div>
+
+        <script src="js/jquery.min.js"></script>
+        <script src="js/jquery.flot.min.js"></script>
         <script src="js/plugins.js"></script>
         <script src="js/main.js"></script>
-
-        <!-- Google Analytics: change UA-XXXXX-X to be your site's ID. -->
         <script>
-            (function(b,o,i,l,e,r){b.GoogleAnalyticsObject=l;b[l]||(b[l]=
-            function(){(b[l].q=b[l].q||[]).push(arguments)});b[l].l=+new Date;
-            e=o.createElement(i);r=o.getElementsByTagName(i)[0];
-            e.src='//www.google-analytics.com/analytics.js';
-            r.parentNode.insertBefore(e,r)}(window,document,'script','ga'));
-            ga('create','UA-XXXXX-X');ga('send','pageview');
+            /* constants */
+            var timewarp = 8000;
+            var layrate = 45;
+            var frame_cells = 3500;
+            var n_frames = 17;
+            var pollen_per_flight = 0.01;
+            var pollen_per_cell = 0.19;
+            var honey_per_cell = 0.56;
+            var nectar_per_flight = 0.06;
+            var honey_consumption = 0.0000047;
+            var pollen_consumption_queen = 0.005;
+            var pollen_consumption_cell = 0.0025;
+            var honey_store = 9000;
+            var pollen_store = 3000;
+
+
+            /* global */
+            var graph_honey = []
+            var graph_pollen = []
+            var graph_workers = []
+            var wall_clock = 0;
+            var wall_rel = 0;
+            var n_cells = n_frames * frame_cells;
+            var n_eggs = 0;
+            var worker_brood = 0;
+            var drone_brood = 0;
+
+            var cells   = [];
+            var workers = [];
+            var drones  = [];
+            var queens  = [{"age": (23 * 24 * 60 * 60), "fertile": true, "out": false, "next_egg": 30}];
+
+            /* initial we add thousand bees of a variaty of ages, but they will be out of their cells */
+            for (var i = 0; i < 8000; i++) {
+                workers.push({"ovaries": 0, "age": (Math.floor((Math.random() * 50)) * 24 * 60 * 60), "foraging": 0, "pollen": 0, "nectar": 0});
+            }
+
+            /* cell */
+            function cell_add_honey(x) {
+                /* find empty cell or partially filled with honey */
+                honey_store += x;
+            }
+
+            function cell_add_pollen(x) {
+                /* find empty cell or partially filled with pollen */
+                pollen_store += x;
+            }
+
+	    function harvesthoney() {
+	    	honey_store -= 5000;
+	    }
+
+            /* workerbee */
+            function workerbee_tick() {
+                for (var worker in workers) {
+                    /* if no queen feromone is present, a worker will develop ovaries
+                     * academic question: if a queen is introduced, should the value be reset?
+                     */
+
+                    /* egg (3 days) larva (6.5 days) */
+                    if (workers[worker]['age'] < (9.5 * 24 * 60 * 60)) {
+                        if (pollen_store >= pollen_consumption_cell) {
+                            pollen_store -= pollen_consumption_cell;
+                            workers[worker]['starvation'] = 0;
+                        } else {
+                            workers[worker]['starvation'] += timewarp;
+                        }
+                    } else {
+			    if (honey_store > (honey_consumption * timewarp)) {
+				honey_store -= honey_consumption * timewarp;
+				workers[worker]['starvation'] = 0;
+			    } else {
+				workers[worker]['starvation'] += timewarp;
+			    }
+		    }
+
+                    if (queens.length == 0 && orkers[worker]['age'] >= (20 * 24 * 60 * 60)) {
+                        workers[worker]['ovaries']++;
+                    }
+
+                    if (workers[worker]['ovaries'] > (7 * 24 * 60 * 60) && (n_cells - cells.length) > 0 && (workers[worker]['ovaries'] % 5 == 0)) {
+                        cells.push('drone');
+                        drones.push({'age': 0});
+                    }
+
+                    if (wall_clock % 86400 > 28800 && wall_clock % 68400) {
+                        if (workers[worker]['age'] >= ((20 + 14) * 24 * 60 * 60)) {
+                            while (workers[worker]['foraging'] <= 0) {
+                                if (workers[worker]['age'] <= ((20 + 21) * 24 * 60 * 60)) {
+                                    cell_add_pollen(workers[worker]['pollen']);
+                                    workers[worker]['foraging'] += Math.floor((Math.random() * 30 * 60) + 120); /* TODO research max number of minutes out of the hyve */
+                                    workers[worker]['pollen'] = pollen_per_flight;
+                                } else {
+                                    cell_add_honey(workers[worker]['nectar'] / 2);
+                                    workers[worker]['foraging'] += Math.floor((Math.random() * 30 * 60) + 120); /* TODO research max number of minutes out of the hyve */
+                                    workers[worker]['nectar'] = nectar_per_flight;
+                                }
+
+                            }
+                            workers[worker]['foraging'] -= timewarp;
+                        }
+                    }
+
+                    workers[worker]['age'] += timewarp;
+                }
+
+                /* old bees must die */
+                workers = workers.filter(function(bee){ return (bee['age'] < ((20 + 6 * 7) * 24 * 60 * 60)) && bee['starvation'] < 7200 }); /* bees live about 6 weeks and die if there is no food */
+
+            }
+
+            /* queen */
+            function queen_tick() {
+                /* TODO: swarm */
+                if (queens.length == 1) {
+                    if (pollen_store >= (pollen_consumption_queen * timewarp)) {
+                        if (queens[0]['fertile'] && !queens[0]['out'] && (1.9*(worker_brood + drone_brood) + (pollen_store / pollen_per_cell) + (honey_store / honey_per_cell)) < n_cells) {
+                            while (queens[0]['next_egg'] < 0) {
+                                if (Math.floor((Math.random() * 4) + 0) == 0) {
+                                    drones.push({"age": 0, "starvation": 0})
+                                } else {
+                                    workers.push({"ovaries": 0, "age": 0, "foraging": 0, "pollen": 0, "nectar": 0})
+                                }
+                                queens[0]['next_egg'] += layrate;
+                                n_eggs += 1;
+                            }
+
+                            queens[0]['next_egg'] -= timewarp;
+                        }
+                        pollen_store -= pollen_consumption_queen * timewarp;
+                    }
+                    queens[0]['age'] += timewarp;
+                }
+            }
+
+            /* drones */
+            function drone_tick() {
+                for (var drone in drones) {
+		   if (drones[drone]['age'] > (24 * 24 * 60 * 60)) {
+			   if (honey_store > (honey_consumption * timewarp)) {
+			       honey_store -= honey_consumption * timewarp;
+			       drones[drone]['starvation'] = 0;
+			   } else {
+			       drones[drone]['starvation'] += timewarp;
+			   }
+		   }
+
+                   drones[drone]['age'] += timewarp;
+                }
+            }
+
+            function renderwall_tick() {
+                var days = Math.floor(wall_clock / (24 * 3600));
+                var hours = Math.floor(wall_clock / 3600) % 24;
+                var minutes = Math.floor(wall_clock / 60) % 60;
+
+                $("#clock").text("timeclock: "+wall_clock+" // days: "+days+" hours: "+hours+" minutes: "+minutes);
+               $("#honey_store").text('honey: '+honey_store.toFixed(2)+'g');
+                $("#pollen_store").text('pollen: '+pollen_store.toFixed(2)+'g');
+                $("#eggs").text('eggs: '+n_eggs);
+
+                var pollenx = 0;
+                var nectarx = 0;
+                worker_brood = 0;
+                drone_brood = 0;
+
+                for (var worker in workers) {
+                    if (workers[worker]['age'] >= ((20 + 14) * 24 * 60 * 60)) {
+                        if (workers[worker]['age'] <= ((20 + 21) * 24 * 60 * 60)) {
+                            pollenx++;
+                        } else {
+                            nectarx++;
+                        }
+                    } else {
+                        worker_brood++;
+                    }
+                }
+
+		for (var drone in drones) {
+		    if (drones[drone]['age'] < (24 * 24 * 60 * 60)) {
+		    	drone_brood++;
+		    }
+		}
+
+                $("#cells").text("used cells: "+Math.ceil(worker_brood + drone_brood + (pollen_store / pollen_per_cell) + (honey_store / honey_per_cell))+" ("+n_cells+")");
+                $("#drones").text('drones: '+(drones.length-drone_brood)+' ('+drone_brood+')');
+                $("#workers").text('workers: '+(workers.length-worker_brood)+' (brood: '+worker_brood+', pollen: '+pollenx+', nectar: '+nectarx+')');
+
+                graph_honey.push([wall_rel, honey_store]);
+                graph_pollen.push([wall_rel, pollen_store]);
+                graph_workers.push([wall_rel, (workers.length-worker_brood)]);
+                wall_rel++;
+                plot.setData([graph_honey, graph_pollen, graph_workers]);
+                plot.draw();
+
+                setTimeout(renderwall_tick, 400);
+            }
+
+            function tick() {
+                wall_clock += timewarp;
+                workerbee_tick();
+                drone_tick();
+                queen_tick();
+
+                setTimeout(tick, 100);
+            }
+
+            $(document).ready(function() {
+                plot = $.plot("#placeholder", [], {
+                    series: {
+                        shadowSize: 0   // Drawing is faster without shadows
+                    },
+                    yaxis: {
+                        min: 0,
+                        max: 30000
+                    },
+                    xaxis: {
+                        min: 0,
+                        max: 200,
+                        show: false
+                    }
+                });
+
+                setTimeout(tick, 100);
+                setTimeout(renderwall_tick, 100);
+
+            });
         </script>
     </body>
 </html>
